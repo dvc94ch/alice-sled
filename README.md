@@ -1,8 +1,9 @@
 # Results
 
+```
 -------------------------------------------------------------------------------
 ALICE tool version 0.0.1. Please go through the documentation, particularly the
-listed caveats and limitations, before deriving any inferences from this tool. 
+listed caveats and limitations, before deriving any inferences from this tool.
 -------------------------------------------------------------------------------
 Parsing traces to determine logical operations ...
 Logical operations:
@@ -25,3 +26,4 @@ WARNING: Application found to be inconsistent after the entire workload complete
 (Dynamic vulnerability) Across-syscall atomicity, sometimes concerning durability: Operations 0 until 12 need to be atomically persisted
 (Static vulnerability) Across-syscall atomicity: Operation B-/home/dvc/ipld/alice-sled/target/release/sled-workload:0x56044bbde468[None] until B-/usr/lib/libpthread-2.32.so:0x7f451db6757b[fsync]
 Done finding vulnerabilities.
+```
