@@ -9,7 +9,7 @@ fn shift_bytes_by(shift: usize) -> sled::IVec {
 }
 
 fn main() -> anyhow::Result<()>{
-    let db = sled::open("workload_dir/db")?;
+    let db = sled::open("workload_dir")?;
     for i in 0..10 {
         let key = shift_bytes_by(i);
         let value = shift_bytes_by(i + 10);

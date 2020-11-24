@@ -10,6 +10,7 @@ fn shift_bytes_by(shift: usize) -> sled::IVec {
 
 fn main() -> anyhow::Result<()>{
     let crashed_state_directory =  std::env::args().skip(1).next().unwrap();
+    println!("{}", crashed_state_directory);
     let db = sled::open(crashed_state_directory)?;
     for i in 0..10 {
         let key = shift_bytes_by(i);
