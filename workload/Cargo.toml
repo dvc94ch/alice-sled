@@ -1,0 +1,9 @@
+[package]
+name = "sled-workload"
+version = "0.1.0"
+authors = ["David Craven <david@craven.ch>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.34"
+sled = "0.34.6"
