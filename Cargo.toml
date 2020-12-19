@@ -1,2 +1,5 @@
 [workspace]
 members = ["checker", "workload"]
+
+[profile.release]
+debug = true
