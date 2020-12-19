@@ -16,7 +16,7 @@ mkdir traces_dir
 # Compiling all files, and running init.cc
 cargo build --release
 
-PATH=$PATH:/home/dvc/ipld/alice/bin:/home/dvc/ipld/alice/alice-strace
+PATH=$PATH:/home/david/Source/alice/bin:/home/david/Source/alice/alice-strace
 
 # Perform the actual workload and collect traces. The "workload_dir" argument
 # to alice-record specifies the entire directory which will be re-constructed
