@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.34"
-sled = "0.34.6"
+sled = { path = "../../sled" }
 
 [profile.release]
 debug = true
