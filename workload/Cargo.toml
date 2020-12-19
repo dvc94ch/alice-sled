@@ -7,3 +7,6 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.34"
 sled = "0.34.6"
+
+[profile.release]
+debug = true
