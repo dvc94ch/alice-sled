@@ -16,5 +16,6 @@ fn main() -> anyhow::Result<()>{
         db.insert(key, value)?;
     }
     db.flush()?;
+    println!("Flushed");
     Ok(())
 }

@@ -9,13 +9,17 @@ fn shift_bytes_by(shift: usize) -> sled::IVec {
 }
 
 fn main() -> anyhow::Result<()>{
-    let crashed_state_directory =  std::env::args().skip(1).next().unwrap();
-    println!("{}", crashed_state_directory);
+    let mut args = std::env::args().skip(1);
+    let crashed_state_directory = args.next().unwrap();
+    let stdout_file = args.next().unwrap();
+    let stdout = std::fs::read_to_string(stdout_file).unwrap();
     let db = sled::open(crashed_state_directory)?;
-    for i in 0..10 {
-        let key = shift_bytes_by(i);
-        let value = shift_bytes_by(i + 10);
-        assert_eq!(db.get(key)?, Some(value));
+    if stdout.contains("Flushed") {
+        for i in 0..10 {
+            let key = shift_bytes_by(i);
+            let value = shift_bytes_by(i + 10);
+            assert_eq!(db.get(key)?, Some(value));
+        }
     }
     Ok(())
 }
