@@ -1,7 +1,7 @@
 #!/bin/bash
 
-export ALICE_HOME=/home/david/Source/alice
-PATH=$PATH:/home/david/Source/alice/bin
+export ALICE_HOME=/home/david/Code/alice
+PATH=$PATH:/home/david/Code/alice/bin
 
 cargo build --release
 
