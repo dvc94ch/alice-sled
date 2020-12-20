@@ -6,4 +6,4 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.34"
-sled = { path = "../../sled" }
+sled = { path = "../sled" }

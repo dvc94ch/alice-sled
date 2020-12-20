@@ -1,0 +1,6 @@
+[submodule "alice"]
+	path = alice
+	url = https://github.com/divergentdave/alice.git
+[submodule "sled"]
+	path = sled
+	url = https://github.com/spacejam/sled.git
