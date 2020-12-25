@@ -8,13 +8,14 @@ fn shift_bytes_by(shift: usize) -> sled::IVec {
     buf.into()
 }
 
-fn main() -> anyhow::Result<()>{
+fn main() -> anyhow::Result<()> {
     let db = sled::open("workload_dir")?;
     for i in 0..10 {
         let key = shift_bytes_by(i);
         let value = shift_bytes_by(i + 10);
         db.insert(key, value)?;
     }
+    db.insert(b"large value", vec![b'A'; 1024 * 1024])?;
     db.flush()?;
     println!("Flushed");
     Ok(())

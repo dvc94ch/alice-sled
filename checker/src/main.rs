@@ -8,7 +8,7 @@ fn shift_bytes_by(shift: usize) -> sled::IVec {
     buf.into()
 }
 
-fn main() -> anyhow::Result<()>{
+fn main() -> anyhow::Result<()> {
     let mut args = std::env::args().skip(1);
     let crashed_state_directory = args.next().unwrap();
     let stdout_file = args.next().unwrap();
@@ -20,6 +20,10 @@ fn main() -> anyhow::Result<()>{
             let value = shift_bytes_by(i + 10);
             assert_eq!(db.get(key)?, Some(value));
         }
+        assert_eq!(
+            db.get(b"large value")?.as_ref().map(AsRef::as_ref),
+            Some(&[b'A'; 1024 * 1024][..]),
+        );
     }
     Ok(())
 }
