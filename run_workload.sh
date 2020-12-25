@@ -2,11 +2,13 @@
 set -e
 trap 'error ${LINENO}' ERR
 
+CASE=basic
+
 TOPSRCDIR="$(realpath "$(dirname "$0")")"
 PATH="$PATH:$TOPSRCDIR/alice/bin:$TOPSRCDIR/alice/alice-strace"
 source "$TOPSRCDIR/.venv/bin/activate"
 
-cd "$TOPSRCDIR/cases/basic"
+cd "$TOPSRCDIR/cases/$CASE"
 
 # The workload directory is where the files of the application will be stored.
 # The application, as it runs, will modify the workload directory and its
@@ -29,4 +31,4 @@ cargo build --release
 # argument specifies where all the traces recorded will be stored.
 alice-record --workload_dir workload_dir \
 	--traces_dir traces_dir \
-	"$TOPSRCDIR/target/release/basic_workload"
+	"$TOPSRCDIR/target/release/${CASE}_workload"
