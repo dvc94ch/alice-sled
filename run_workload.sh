@@ -3,9 +3,11 @@ set -e
 trap 'error ${LINENO}' ERR
 
 CASE="$1"
+shift
+PARAMETERS="$@"
 if [[ -z $CASE || ! -d "cases/$CASE" ]];
 then
-    echo "Usage: $0 CASE_NAME"
+    echo "Usage: $0 CASE_NAME [PARAMETERS]"
     exit 2
 fi
 
@@ -36,4 +38,4 @@ cargo build --release
 # argument specifies where all the traces recorded will be stored.
 alice-record --workload_dir workload_dir \
 	--traces_dir traces_dir \
-	"$TOPSRCDIR/target/release/${CASE}_workload"
+	"$TOPSRCDIR/target/release/${CASE}_workload" "$PARAMETERS"
