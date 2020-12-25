@@ -2,7 +2,12 @@
 set -e
 trap 'error ${LINENO}' ERR
 
-CASE=basic
+CASE="$1"
+if [[ -z $CASE || ! -d "cases/$CASE" ]];
+then
+    echo "Usage: $0 CASE_NAME"
+    exit 2
+fi
 
 TOPSRCDIR="$(realpath "$(dirname "$0")")"
 PATH="$PATH:$TOPSRCDIR/alice/bin:$TOPSRCDIR/alice/alice-strace"

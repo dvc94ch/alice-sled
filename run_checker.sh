@@ -1,6 +1,11 @@
 #!/bin/bash
 
-CASE=basic
+CASE="$1"
+if [[ -z $CASE || ! -d "cases/$CASE" ]];
+then
+    echo "Usage: $0 CASE_NAME"
+    exit 2
+fi
 
 TOPSRCDIR="$(realpath "$(dirname "$0")")"
 export ALICE_HOME="$TOPSRCDIR/alice"
