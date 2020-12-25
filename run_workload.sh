@@ -2,6 +2,11 @@
 set -e
 trap 'error ${LINENO}' ERR
 
+TOPSRCDIR="$(realpath "$(dirname "$0")")"
+PATH="$PATH:$TOPSRCDIR/alice/bin:$TOPSRCDIR/alice/alice-strace"
+
+cd "$TOPSRCDIR/cases/basic"
+
 # The workload directory is where the files of the application will be stored.
 # The application, as it runs, will modify the workload directory and its
 # contents.
@@ -13,10 +18,8 @@ mkdir workload_dir
 rm -rf traces_dir
 mkdir traces_dir
 
-# Compiling all files, and running init.cc
+# Compiling all files
 cargo build --release
-
-PATH=$PATH:alice/bin:alice/alice-strace
 
 # Perform the actual workload and collect traces. The "workload_dir" argument
 # to alice-record specifies the entire directory which will be re-constructed
@@ -25,4 +28,4 @@ PATH=$PATH:alice/bin:alice/alice-strace
 # argument specifies where all the traces recorded will be stored.
 alice-record --workload_dir workload_dir \
 	--traces_dir traces_dir \
-	./target/release/sled-workload
+	"$TOPSRCDIR/target/release/basic_workload"

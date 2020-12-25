@@ -1,4 +1,4 @@
-const RANDOM_BYTES: &[u8] = include_bytes!("../../random.txt");
+const RANDOM_BYTES: &[u8] = include_bytes!("../../random.bin");
 
 fn shift_bytes_by(shift: usize) -> sled::IVec {
     let mut buf = Vec::with_capacity(RANDOM_BYTES.len());

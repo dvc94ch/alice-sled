@@ -205,15 +205,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sled-checker"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "sled",
-]
-
-[[package]]
-name = "sled-workload"
+name = "sled-workload-basic"
 version = "0.1.0"
 dependencies = [
  "anyhow",

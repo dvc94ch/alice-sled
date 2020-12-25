@@ -1,5 +1,5 @@
 [workspace]
-members = ["checker", "workload"]
+members = ["cases/basic"]
 exclude = ["sled"]
 
 [profile.release]
