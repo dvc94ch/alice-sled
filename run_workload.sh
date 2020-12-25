@@ -4,6 +4,7 @@ trap 'error ${LINENO}' ERR
 
 TOPSRCDIR="$(realpath "$(dirname "$0")")"
 PATH="$PATH:$TOPSRCDIR/alice/bin:$TOPSRCDIR/alice/alice-strace"
+source "$TOPSRCDIR/.venv/bin/activate"
 
 cd "$TOPSRCDIR/cases/basic"
 

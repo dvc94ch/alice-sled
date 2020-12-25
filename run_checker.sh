@@ -3,6 +3,7 @@
 TOPSRCDIR="$(realpath "$(dirname "$0")")"
 export ALICE_HOME="$TOPSRCDIR/alice"
 PATH="$PATH:$TOPSRCDIR/alice/bin"
+source "$TOPSRCDIR/.venv/bin/activate"
 
 cd "$TOPSRCDIR/cases/basic"
 

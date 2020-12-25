@@ -2,3 +2,4 @@
 *.gdb
 traces_dir
 workload_dir
+/.venv
