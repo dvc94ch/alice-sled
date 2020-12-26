@@ -20,10 +20,6 @@ fn main() -> Result<(), sled::Error> {
             let value = shift_bytes_by(i + 10);
             assert_eq!(db.get(key)?, Some(value));
         }
-        assert_eq!(
-            db.get(b"large value")?.as_ref().map(AsRef::as_ref),
-            Some(&[b'A'; 1024 * 1024][..]),
-        );
     }
     Ok(())
 }

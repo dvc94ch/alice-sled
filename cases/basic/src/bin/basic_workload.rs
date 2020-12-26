@@ -15,7 +15,6 @@ fn main() -> Result<(), sled::Error> {
         let value = shift_bytes_by(i + 10);
         db.insert(key, value)?;
     }
-    db.insert(b"large value", vec![b'A'; 1024 * 1024])?;
     db.flush()?;
     println!("Flushed");
     Ok(())
