@@ -8,7 +8,7 @@ fn shift_bytes_by(shift: usize) -> sled::IVec {
     buf.into()
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<(), sled::Error> {
     let mut args = std::env::args().skip(1);
     let crashed_state_directory = args.next().unwrap();
     let stdout_file = args.next().unwrap();

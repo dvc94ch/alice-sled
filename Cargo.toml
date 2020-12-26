@@ -1,5 +1,5 @@
 [workspace]
-members = ["cases/basic"]
+members = ["cases/*"]
 exclude = ["sled"]
 
 [profile.release]

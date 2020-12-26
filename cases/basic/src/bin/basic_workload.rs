@@ -8,7 +8,7 @@ fn shift_bytes_by(shift: usize) -> sled::IVec {
     buf.into()
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<(), sled::Error> {
     let db = sled::open("workload_dir")?;
     for i in 0..10 {
         let key = shift_bytes_by(i);
