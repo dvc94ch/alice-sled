@@ -6,4 +6,4 @@ edition = "2018"
 
 [dependencies]
 rand = "0.7.0"
-sled = { path = "../../sled" }
+sled = { path = "../../sled", features = ["testing"] }
