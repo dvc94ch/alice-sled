@@ -14,6 +14,7 @@ source "$TOPSRCDIR/.venv/bin/activate"
 
 cd "$TOPSRCDIR/cases/$CASE"
 
+set -e
 cargo build --release
 
 alice-check --traces_dir=traces_dir \
