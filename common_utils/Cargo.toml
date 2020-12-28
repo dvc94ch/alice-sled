@@ -1,12 +1,10 @@
 [package]
-name = "sled-workload-insert-loop"
+name = "common_utils"
 version = "0.1.0"
 authors = ["David Cook <divergentdave@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-clap = "2.33.3"
-common_utils = { path = "../../common_utils" }
-fs2 = "0.4.3"
 libc = "0.2.81"
 rand = "0.7.0"
+sled = { path = "../sled" }

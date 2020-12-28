@@ -1,3 +1,5 @@
+use common_utils::*;
+
 const RANDOM_BYTES: &[u8] = include_bytes!("../../random.bin");
 
 fn shift_bytes_by(shift: usize) -> sled::IVec {

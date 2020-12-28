@@ -1,6 +1,4 @@
 use std::process;
-use std::thread;
-use std::time::Duration;
 
 use clap::{App, Arg};
 use fs2::FileExt;
@@ -8,18 +6,7 @@ use rand::Rng;
 
 use sled_workload_insert_loop::*;
 
-const DB_DIR: &str = "workload_dir";
 const DEFAULT_LOOP_COUNT: usize = CYCLE * 10;
-
-fn start_timer() {
-    thread::spawn(|| {
-        let runtime = rand::thread_rng().gen_range(0, 60);
-        thread::sleep(Duration::from_millis(runtime));
-        unsafe {
-            libc::raise(9);
-        }
-    });
-}
 
 fn main() {
     let matches = App::new("insert_loop_workload")
@@ -103,19 +90,19 @@ fn run(loop_count: usize, crash: bool) -> Result<(), sled::Error> {
     let crash_during_initialization = rand::thread_rng().gen_bool(0.1);
 
     if crash && crash_during_initialization {
-        start_timer();
+        start_sigkill_timer();
     }
 
     // wait for previous crashed process's file lock to be released
-    let db_file_path = std::path::PathBuf::from(DB_DIR).join("db");
+    let db_file_path = std::path::PathBuf::from(WORKLOAD_DIR).join("db");
     if db_file_path.is_file() {
         std::fs::File::open(db_file_path)?.lock_exclusive()?;
     }
 
-    let db = config(DB_DIR).open()?;
+    let db = config(WORKLOAD_DIR).open()?;
 
     if crash && !crash_during_initialization {
-        start_timer();
+        start_sigkill_timer();
     }
 
     let (key, highest, wrap_count) = verify(&db)?;

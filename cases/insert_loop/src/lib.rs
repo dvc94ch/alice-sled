@@ -1,19 +1,9 @@
 use std::mem::size_of;
-use std::path::Path;
 
-use sled::Config;
+pub use common_utils::*;
 
-pub const SEGMENT_SIZE: usize = 1024;
 pub const CYCLE: usize = 256;
 pub const WRAP_COUNT_KEY: &[u8] = b"wrap_count";
-
-pub fn config<P: AsRef<Path>>(path: P) -> Config {
-    Config::new()
-        .cache_capacity(128 * 1024 * 1024)
-        .flush_every_ms(Some(1))
-        .path(path)
-        .segment_size(SEGMENT_SIZE)
-}
 
 pub fn u32_to_vec(u: u32) -> Vec<u8> {
     let buf: [u8; size_of::<u32>()] = u.to_be_bytes();

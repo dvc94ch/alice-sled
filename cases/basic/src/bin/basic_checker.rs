@@ -1,3 +1,5 @@
+use common_utils::*;
+
 const RANDOM_BYTES: &[u8] = include_bytes!("../../random.bin");
 
 fn shift_bytes_by(shift: usize) -> sled::IVec {
@@ -9,9 +11,7 @@ fn shift_bytes_by(shift: usize) -> sled::IVec {
 }
 
 fn main() -> Result<(), sled::Error> {
-    let mut args = std::env::args().skip(1);
-    let crashed_state_directory = args.next().unwrap();
-    let stdout_file = args.next().unwrap();
+    let (crashed_state_directory, stdout_file) = checker_arguments();
     let stdout = std::fs::read_to_string(stdout_file).unwrap();
     let db = sled::open(crashed_state_directory)?;
     if stdout.contains("Flushed") {
