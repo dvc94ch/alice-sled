@@ -38,4 +38,4 @@ cargo build --release
 # argument specifies where all the traces recorded will be stored.
 alice-record --workload_dir workload_dir \
 	--traces_dir traces_dir \
-	"$TOPSRCDIR/target/release/${CASE}_workload" "$PARAMETERS"
+	"$TOPSRCDIR/target/release/${CASE}_workload" $PARAMETERS

@@ -312,6 +312,8 @@ name = "sled-workload-insert-loop"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "fs2",
+ "libc",
  "rand",
  "sled",
 ]
