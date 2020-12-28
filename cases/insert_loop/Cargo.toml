@@ -5,5 +5,6 @@ authors = ["David Cook <divergentdave@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+clap = "2.33.3"
 rand = "0.7.0"
 sled = { path = "../../sled" }
