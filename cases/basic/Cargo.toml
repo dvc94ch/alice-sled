@@ -5,4 +5,4 @@ authors = ["David Craven <david@craven.ch>"]
 edition = "2018"
 
 [dependencies]
-sled = { path = "../../sled", features = ["testing"] }
+sled = { path = "../../sled" }
