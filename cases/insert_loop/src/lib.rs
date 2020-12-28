@@ -1,16 +1,16 @@
 use std::mem::size_of;
+use std::path::Path;
 
 use sled::Config;
 
-pub const DB_DIR: &str = "workload_dir";
 pub const SEGMENT_SIZE: usize = 1024;
 pub const CYCLE: usize = 256;
 
-pub fn config() -> Config {
+pub fn config<P: AsRef<Path>>(path: P) -> Config {
     Config::new()
         .cache_capacity(128 * 1024 * 1024)
         .flush_every_ms(Some(1))
-        .path(DB_DIR)
+        .path(path)
         .segment_size(SEGMENT_SIZE)
 }
 

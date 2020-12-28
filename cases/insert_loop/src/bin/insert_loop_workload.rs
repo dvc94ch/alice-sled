@@ -5,8 +5,10 @@ use rand::Rng;
 
 use sled_workload_insert_loop::*;
 
+const DB_DIR: &str = "workload_dir";
+const DEFAULT_LOOP_COUNT: usize = CYCLE * 10;
+
 fn main() -> Result<(), sled::Error> {
-    const DEFAULT_LOOP_COUNT: usize = CYCLE * 10;
     let loop_count = if let Some(argument) = env::args().skip(1).next() {
         if argument.is_empty() {
             DEFAULT_LOOP_COUNT
@@ -20,10 +22,10 @@ fn main() -> Result<(), sled::Error> {
         DEFAULT_LOOP_COUNT
     };
 
-    let db = config().open()?;
+    let db = config(DB_DIR).open()?;
 
     let mut hu = 0;
-    for _  in 0..loop_count {
+    for _ in 0..loop_count {
         hu += 1;
 
         if hu / CYCLE >= CYCLE {
