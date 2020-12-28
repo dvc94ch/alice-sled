@@ -46,30 +46,37 @@ fn main() {
     };
     let crash = matches.is_present("crash");
 
-    loop {
-        let child = unsafe { libc::fork() };
-        if child == 0 {
-            if let Err(e) = run(loop_count, crash) {
-                eprintln!("{}", e);
-                process::exit(1);
-            } else {
-                break;
-            }
-        } else {
-            let mut status: libc::c_int = 0;
-            unsafe {
-                libc::waitpid(child, &mut status as *mut libc::c_int, 0);
-            }
-            match (libc::WIFEXITED(status), libc::WEXITSTATUS(status)) {
-                (true, 9) => continue,
-                (true, 0) => break,
-                (true, exit_status) => {
-                    eprintln!("child exited with status {}", exit_status);
+    if !crash {
+        if let Err(e) = run(loop_count, false) {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    } else {
+        loop {
+            let child = unsafe { libc::fork() };
+            if child == 0 {
+                if let Err(e) = run(loop_count, crash) {
+                    eprintln!("{}", e);
                     process::exit(1);
+                } else {
+                    break;
                 }
-                (false, _) => {
-                    eprintln!("child exited abnormally");
-                    process::exit(1);
+            } else {
+                let mut status: libc::c_int = 0;
+                unsafe {
+                    libc::waitpid(child, &mut status as *mut libc::c_int, 0);
+                }
+                match (libc::WIFEXITED(status), libc::WEXITSTATUS(status)) {
+                    (true, 9) => continue,
+                    (true, 0) => break,
+                    (true, exit_status) => {
+                        eprintln!("child exited with status {}", exit_status);
+                        process::exit(1);
+                    }
+                    (false, _) => {
+                        eprintln!("child exited abnormally");
+                        process::exit(1);
+                    }
                 }
             }
         }
