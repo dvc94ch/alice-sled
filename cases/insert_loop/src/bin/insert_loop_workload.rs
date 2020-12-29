@@ -35,55 +35,7 @@ fn main() {
     };
     let crash = matches.is_present("crash");
 
-    if !crash {
-        if let Err(e) = run(loop_count, false) {
-            eprintln!("{}", e);
-            process::exit(1);
-        }
-    } else {
-        loop {
-            let child = unsafe { libc::fork() };
-            if child == 0 {
-                if let Err(e) = run(loop_count, crash) {
-                    eprintln!("{}", e);
-                    process::exit(1);
-                } else {
-                    break;
-                }
-            } else if child == -1 {
-                eprintln!("fork failed, errno is {}", unsafe {
-                    *libc::__errno_location()
-                });
-                process::exit(1);
-            } else {
-                let mut status: libc::c_int = 0;
-                let rv = unsafe { libc::waitpid(child, &mut status as *mut libc::c_int, 0) };
-                if rv == -1 {
-                    eprintln!("waitpid failed, errno is {}", unsafe {
-                        *libc::__errno_location()
-                    });
-                    process::exit(1);
-                }
-                match (
-                    libc::WIFEXITED(status),
-                    libc::WEXITSTATUS(status),
-                    libc::WIFSIGNALED(status),
-                    libc::WTERMSIG(status),
-                ) {
-                    (true, 0, _, _) => break,
-                    (true, exit_status, _, _) => {
-                        eprintln!("child exited with status {}", exit_status);
-                        process::exit(1);
-                    }
-                    (_, _, true, 9) => continue,
-                    _ => {
-                        eprintln!("child exited abnormally");
-                        process::exit(1);
-                    }
-                }
-            }
-        }
-    }
+    crash_recovery_loop(run, loop_count, crash);
 }
 
 fn run(loop_count: usize, crash: bool) -> Result<(), sled::Error> {
