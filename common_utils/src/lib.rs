@@ -1,10 +1,15 @@
 use std::env;
 use std::error;
+use std::fs;
+use std::io;
+use std::mem::size_of;
 use std::path::Path;
 use std::process;
 use std::thread;
 use std::time::Duration;
 
+pub use clap::{App, Arg};
+use fs2::FileExt;
 use rand::Rng;
 pub use sled;
 use sled::Config;
@@ -92,4 +97,25 @@ pub fn crash_recovery_loop<F: Fn(I, bool) -> Result<(), E>, I, E: error::Error>(
             }
         }
     }
+}
+
+pub fn block_on_database_lock<P: AsRef<Path>>(directory: P) -> io::Result<()> {
+    let db_file_path = directory.as_ref().join("db");
+    if db_file_path.is_file() {
+        let file = fs::File::open(db_file_path)?;
+        file.lock_exclusive()?;
+    }
+    Ok(())
+}
+
+pub fn u32_to_vec(u: u32) -> Vec<u8> {
+    let buf: [u8; size_of::<u32>()] = u.to_be_bytes();
+    buf.to_vec()
+}
+
+pub fn slice_to_u32(b: &[u8]) -> u32 {
+    let mut buf = [0u8; size_of::<u32>()];
+    buf.copy_from_slice(&b[..size_of::<u32>()]);
+
+    u32::from_be_bytes(buf)
 }

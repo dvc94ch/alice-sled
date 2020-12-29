@@ -10,4 +10,7 @@ cd alice-sled
 
 ./run_workload.sh insert_loop 20
 ./run_checker.sh insert_loop
+
+./run_workload.sh batches 5
+./run_checker.sh batches
 ```

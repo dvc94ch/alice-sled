@@ -1,7 +1,5 @@
 use std::process;
 
-use clap::{App, Arg};
-use fs2::FileExt;
 use rand::Rng;
 
 use sled_workload_insert_loop::*;
@@ -12,9 +10,9 @@ fn main() {
     let matches = App::new("insert_loop_workload")
         .arg(
             Arg::with_name("loop_count")
-                .takes_value(true)
                 .index(1)
-                .required(false),
+                .required(false)
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("crash")
@@ -41,14 +39,11 @@ fn main() {
 fn run(loop_count: usize, crash: bool) -> Result<(), sled::Error> {
     let crash_during_initialization = rand::thread_rng().gen_bool(0.1);
 
+    // wait for previous crashed process's file lock to be released
+    block_on_database_lock(WORKLOAD_DIR)?;
+
     if crash && crash_during_initialization {
         start_sigkill_timer();
-    }
-
-    // wait for previous crashed process's file lock to be released
-    let db_file_path = std::path::PathBuf::from(WORKLOAD_DIR).join("db");
-    if db_file_path.is_file() {
-        std::fs::File::open(db_file_path)?.lock_exclusive()?;
     }
 
     let db = config(WORKLOAD_DIR).open()?;

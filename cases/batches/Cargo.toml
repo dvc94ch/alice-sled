@@ -1,5 +1,5 @@
 [package]
-name = "sled-workload-insert-loop"
+name = "sled-workload-batches"
 version = "0.1.0"
 authors = ["David Cook <divergentdave@gmail.com>"]
 edition = "2018"

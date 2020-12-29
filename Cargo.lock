@@ -78,6 +78,8 @@ dependencies = [
 name = "common_utils"
 version = "0.1.0"
 dependencies = [
+ "clap",
+ "fs2",
  "libc",
  "rand",
  "sled",
@@ -317,13 +319,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sled-workload-batches"
+version = "0.1.0"
+dependencies = [
+ "common_utils",
+ "rand",
+]
+
+[[package]]
 name = "sled-workload-insert-loop"
 version = "0.1.0"
 dependencies = [
- "clap",
  "common_utils",
- "fs2",
- "libc",
  "rand",
 ]
 
