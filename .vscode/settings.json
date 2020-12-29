@@ -1,3 +1,5 @@
 {
+    "C_Cpp.formatting": "Disabled",
+    "python.formatting.provider": "none",
     "editor.formatOnSave": true
 }
