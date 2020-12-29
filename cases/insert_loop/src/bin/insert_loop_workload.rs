@@ -6,7 +6,7 @@ use rand::Rng;
 
 use sled_workload_insert_loop::*;
 
-const DEFAULT_LOOP_COUNT: usize = CYCLE * 10;
+const DEFAULT_LOOP_COUNT: usize = 40;
 
 fn main() {
     let matches = App::new("insert_loop_workload")
