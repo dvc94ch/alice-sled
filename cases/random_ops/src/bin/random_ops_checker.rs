@@ -12,7 +12,11 @@ fn main() -> Result<(), sled::Error> {
         .idgen_persist_interval(1)
         .open()?;
 
-    verify_against_ops(&db, &ops)?;
+    let mut reference = verify_against_ops(&db, &ops)?;
+
+    let id = db.generate_id()?;
+    let virtual_op = Op::IdResultVirtualOp(id);
+    reference.update_before(&virtual_op);
 
     Ok(())
 }
