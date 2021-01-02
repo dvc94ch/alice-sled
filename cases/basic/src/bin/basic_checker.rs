@@ -13,7 +13,10 @@ fn shift_bytes_by(shift: usize) -> sled::IVec {
 fn main() -> Result<(), sled::Error> {
     let (crashed_state_directory, stdout_file) = checker_arguments();
     let stdout = std::fs::read_to_string(stdout_file).unwrap();
-    let db = sled::open(crashed_state_directory)?;
+    let db = sled::Config::new()
+        .path(crashed_state_directory)
+        .segment_size(256)
+        .open()?;
     if stdout.contains("Flushed") {
         for i in 0..10 {
             let key = shift_bytes_by(i);
