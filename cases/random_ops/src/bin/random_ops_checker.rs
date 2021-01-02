@@ -8,7 +8,9 @@ fn main() -> Result<(), sled::Error> {
         .map(Result::unwrap)
         .collect();
 
-    let db = config(crashed_state_directory, CACHE_CAPACITY, SEGMENT_SIZE, true).open()?;
+    let db = config(crashed_state_directory, CACHE_CAPACITY, SEGMENT_SIZE, true)
+        .idgen_persist_interval(1)
+        .open()?;
 
     verify_against_ops(&db, &ops)?;
 
