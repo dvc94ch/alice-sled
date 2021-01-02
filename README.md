@@ -11,6 +11,18 @@ cd alice-sled
 ./run_workload.sh insert_loop 20
 ./run_checker.sh insert_loop
 
+./run_workload.sh insert_loop 20 --crash
+./run_checker.sh insert_loop
+
 ./run_workload.sh batches 5
 ./run_checker.sh batches
+
+./run_workload.sh batches 5 --crash
+./run_checker.sh batches
+
+./run_workload.sh random_ops 40
+./run_checker.sh random_ops
+
+./run_workload.sh random_ops 40 --crash --flusher
+./run_checker.sh random_ops
 ```
