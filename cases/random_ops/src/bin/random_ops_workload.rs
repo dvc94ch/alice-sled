@@ -13,19 +13,17 @@ use sled_workload_random_ops::*;
 
 const DEFAULT_OP_COUNT: usize = 50;
 
-// This workload performs a variety of operations on a tree, records those operations
-// in a reference data structure, and also prints information about the operations to
-// standard output. The checker will read the operations, reconstruct the same reference
-// data structure, and verify the tree. In crash recovery mode, the workload will
-// repeatedly fork a child process, and the child process will send itself SIGKILL after
-// some time. The parent and child process communicate across a pair of pipes. After
-// forking, the parent will send the child all of the serialized operations thus far,
-// and then close the pipe, so that the child can reconstruct its reference data
-// structure before resuming. As the child executes new operations, it will send them
-// across another pipe to the parent process, which will record them for playback to
-// future child processes and copy them to standard output for use by the checker.
-// This child-to-parent pipe will be closed when the child process is killed or finishes
-// executing normally.
+// This workload performs a variety of operations on a tree, records those operations in a
+// reference data structure, and also prints information about the operations to standard output.
+// The checker will read the operations, reconstruct the same reference data structure, and verify
+// the tree. In crash recovery mode, the workload will repeatedly fork a child process, and the
+// child process will send itself SIGKILL after some time. The parent and child process communicate
+// across a pair of pipes. After forking, the parent will send the child all of the serialized
+// operations thus far, and then close the pipe, so that the child can reconstruct its reference
+// data structure before resuming. As the child executes new operations, it will write them to
+// standard output for use by the checker, and send them across another pipe to the parent process,
+// which will record them for playback to future child processes.  This child-to-parent pipe will
+// be closed when the child process is killed or finishes executing normally.
 
 const READ_LIMIT: usize = libc::ssize_t::MAX as usize;
 
@@ -199,7 +197,7 @@ fn main() {
 
             let history_copy = history.lock().unwrap().clone();
 
-            // Start thread to listen on the pipe for new operations and record/print them
+            // Start thread to listen on the pipe for new operations and record them
             let mut io_handle_guard = io_thread_join_handle.lock().unwrap();
             assert!(io_handle_guard.is_none());
             {
@@ -207,14 +205,8 @@ fn main() {
                 let history = history.clone();
                 *io_handle_guard = Some(thread::spawn(move || {
                     let mut history_guard = history.lock().unwrap();
-                    let stdout = io::stdout();
-                    let mut stdout_lock = stdout.lock();
                     for res in OpReader::new(operations_reader) {
                         let op = res.unwrap();
-                        let mut encoded = op.encode();
-                        encoded.push(b'\n');
-                        stdout_lock.write_all(&encoded).unwrap();
-                        stdout_lock.flush().unwrap();
                         history_guard.push(op);
                     }
                     pipes.lock().unwrap().operations.close_read().unwrap();
@@ -281,15 +273,20 @@ fn run(args: (Arc<Mutex<RandomOpsPipes>>, usize, bool), crash: bool) -> Result<(
     }
 
     let mut write_fd = if crash {
-        pipes_guard.operations.writer()
+        Some(pipes_guard.operations.writer())
     } else {
-        unsafe { FileDescriptor::new(1) }
+        None
     };
+    let stdout = io::stdout();
+    let mut stdout_lock = stdout.lock();
     macro_rules! send_op {
         ($op: expr) => {
             let mut encoded = $op.encode();
             encoded.push(b'\n');
-            write_fd.write_all(&encoded)?;
+            if let Some(ref mut write_fd) = write_fd {
+                write_fd.write_all(&encoded)?;
+            }
+            stdout_lock.write_all(&encoded)?;
             history.push($op.clone());
         };
     }
