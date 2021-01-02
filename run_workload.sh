@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-trap 'echo error ${LINENO}' ERR
+trap 'echo $0: error on line ${LINENO}' ERR
 
 CASE="$1"
 shift
