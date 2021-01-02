@@ -1,0 +1,10 @@
+[package]
+name = "sled-workload-random-ops"
+version = "0.1.0"
+authors = ["David Cook <divergentdave@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+common_utils = { path = "../../common_utils" }
+libc = "0.2.81"
+rand = "0.7.0"

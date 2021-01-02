@@ -1,5 +1,7 @@
 pub use common_utils::*;
 
+pub const CACHE_CAPACITY: u64 = 128 * 1024 * 1024;
+pub const SEGMENT_SIZE: usize = 1024;
 pub const CYCLE: usize = 256;
 pub const WRAP_COUNT_KEY: &[u8] = b"wrap_count";
 

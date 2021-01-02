@@ -8,6 +8,7 @@ const DEFAULT_LOOP_COUNT: usize = 40;
 
 fn main() {
     let matches = App::new("insert_loop_workload")
+        .version(crate_version!())
         .arg(
             Arg::with_name("loop_count")
                 .index(1)
@@ -46,7 +47,7 @@ fn run(loop_count: usize, crash: bool) -> Result<(), sled::Error> {
         start_sigkill_timer();
     }
 
-    let db = config(WORKLOAD_DIR).open()?;
+    let db = config(WORKLOAD_DIR, CACHE_CAPACITY, SEGMENT_SIZE, true).open()?;
 
     if crash && !crash_during_initialization {
         start_sigkill_timer();

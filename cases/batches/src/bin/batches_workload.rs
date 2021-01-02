@@ -37,7 +37,7 @@ fn run(batch_count: u32, crash: bool) -> Result<(), sled::Error> {
         start_sigkill_timer();
     }
 
-    let db = config(WORKLOAD_DIR).open()?;
+    let db = config(WORKLOAD_DIR, CACHE_CAPACITY, SEGMENT_SIZE, true).open()?;
 
     if crash && !crash_during_initialization {
         start_sigkill_timer();
@@ -64,6 +64,7 @@ fn run(batch_count: u32, crash: bool) -> Result<(), sled::Error> {
 
 fn main() {
     let matches = App::new("batches_workload")
+        .version(crate_version!())
         .arg(
             Arg::with_name("batch_count")
                 .index(1)

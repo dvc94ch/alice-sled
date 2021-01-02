@@ -8,21 +8,25 @@ use std::process;
 use std::thread;
 use std::time::Duration;
 
-pub use clap::{App, Arg};
+pub use clap::{crate_version, App, Arg};
 use fs2::FileExt;
 use rand::Rng;
 pub use sled;
 use sled::Config;
 
 pub const WORKLOAD_DIR: &str = "workload_dir";
-pub const SEGMENT_SIZE: usize = 1024;
 
-pub fn config<P: AsRef<Path>>(path: P) -> Config {
+pub fn config<P: AsRef<Path>>(
+    path: P,
+    cache_capacity: u64,
+    segment_size: usize,
+    flusher: bool,
+) -> Config {
     Config::new()
-        .cache_capacity(128 * 1024 * 1024)
-        .flush_every_ms(Some(1))
+        .cache_capacity(cache_capacity)
+        .flush_every_ms(if flusher { Some(1) } else { None })
         .path(path)
-        .segment_size(SEGMENT_SIZE)
+        .segment_size(segment_size)
 }
 
 pub fn checker_arguments() -> (String, String) {
@@ -42,8 +46,34 @@ pub fn start_sigkill_timer() {
     });
 }
 
+/// This function provides the scaffolding and unsafe libc calls required for a crash
+/// recovery test. It takes a function to be called in the forked child process, an
+/// argument to be passed to that function, and a boolean indicating whether the crash
+/// recovery loop should be used, or if instead forking should be skipped, and the
+/// function should be called once immediately.
 pub fn crash_recovery_loop<F: Fn(I, bool) -> Result<(), E>, I, E: error::Error>(
     function: F,
+    argument: I,
+    crash: bool,
+) -> ! {
+    crash_recovery_loop_with_hooks(|| {}, function, || {}, || {}, argument, crash)
+}
+
+/// This is the same as `crash_recovery_loop`, but with three more callbacks, `setup` is
+/// called before forking, `parent_after_fork` is called from the parent after forking,
+/// and `teardown` is called from the parent after the child process has exited.
+pub fn crash_recovery_loop_with_hooks<
+    S: Fn(),
+    F: Fn(I, bool) -> Result<(), E>,
+    P: Fn(),
+    T: Fn(),
+    I,
+    E: error::Error,
+>(
+    setup: S,
+    function: F,
+    parent_after_fork: P,
+    teardown: T,
     argument: I,
     crash: bool,
 ) -> ! {
@@ -56,6 +86,7 @@ pub fn crash_recovery_loop<F: Fn(I, bool) -> Result<(), E>, I, E: error::Error>(
         }
     }
     loop {
+        setup();
         let child = unsafe { libc::fork() };
         if child == 0 {
             if let Err(e) = function(argument, true) {
@@ -65,19 +96,24 @@ pub fn crash_recovery_loop<F: Fn(I, bool) -> Result<(), E>, I, E: error::Error>(
                 process::exit(0);
             }
         } else if child == -1 {
+            parent_after_fork();
+            teardown();
             eprintln!("fork failed, errno is {}", unsafe {
                 *libc::__errno_location()
             });
             process::exit(1);
         } else {
+            parent_after_fork();
             let mut status: libc::c_int = 0;
             let rv = unsafe { libc::waitpid(child, &mut status as *mut libc::c_int, 0) };
             if rv == -1 {
+                teardown();
                 eprintln!("waitpid failed, errno is {}", unsafe {
                     *libc::__errno_location()
                 });
                 process::exit(1);
             }
+            teardown();
             match (
                 libc::WIFEXITED(status),
                 libc::WEXITSTATUS(status),
