@@ -18,7 +18,7 @@ pub const WORKLOAD_DIR: &str = "workload_dir";
 
 pub fn config<P: AsRef<Path>>(
     path: P,
-    cache_capacity: u64,
+    cache_capacity: usize,
     segment_size: usize,
     flusher: bool,
 ) -> Config {

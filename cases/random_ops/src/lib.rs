@@ -8,7 +8,7 @@ use rand::Rng;
 pub use common_utils::*;
 
 pub const SEGMENT_SIZE: usize = 256;
-pub const CACHE_CAPACITY: u64 = 256;
+pub const CACHE_CAPACITY: usize = 256;
 pub const BATCH_COUNTER_KEY: &[u8] = b"batch_counter";
 
 #[derive(Debug, Clone, PartialEq, Eq)]

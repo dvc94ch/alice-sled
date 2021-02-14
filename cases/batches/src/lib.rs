@@ -1,7 +1,7 @@
 pub use common_utils::*;
 
 pub const SEGMENT_SIZE: usize = 1024;
-pub const CACHE_CAPACITY: u64 = 128 * 1024 * 1024;
+pub const CACHE_CAPACITY: usize = 128 * 1024 * 1024;
 pub const BATCH_SIZE: u32 = 8;
 
 pub fn verify(tree: &sled::Tree) -> Result<u32, sled::Error> {
