@@ -25,4 +25,8 @@ cd alice-sled
 
 ./run_workload.sh random_ops 40 --crash --flusher
 ./run_checker.sh random_ops
+
+(requires installation of https://github.com/sambayless/monosat first)
+./run_workload.sh transactions
+./run_checker.sh transactions
 ```
