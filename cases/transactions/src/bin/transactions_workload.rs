@@ -201,10 +201,10 @@ fn main() {
         TransactionSpec { ops }
     });
 
-    println!("{}", serde_json::to_string(&transactions).unwrap());
-
     let db_config = config(WORKLOAD_DIR, CACHE_CAPACITY, SEGMENT_SIZE, true);
     let db = Arc::new(db_config.open().unwrap());
+
+    println!("{}", serde_json::to_string(&transactions).unwrap());
 
     let mut handles = Vec::new();
     let barrier = Arc::new(Barrier::new(thread_count));

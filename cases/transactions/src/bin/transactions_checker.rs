@@ -72,7 +72,7 @@ enum TransactionStatus {
     Completed(TransactionCompleted),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct Variable(usize);
 
 impl Not for Variable {
@@ -83,7 +83,7 @@ impl Not for Variable {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Literal {
     Variable(Variable),
     Negation(Variable),
@@ -297,18 +297,23 @@ impl Expression {
             expr @ Expression::Disjunction(_) | expr @ Expression::Literal(_) => vec![expr],
         };
 
+        let mut sorter: BTreeSet<Literal> = BTreeSet::new();
         clauses
             .into_iter()
             .map(|expr| match expr {
                 Expression::Conjunction(_) => panic!("Normalization failed!"),
                 Expression::Disjunction(args) => {
-                    let literals = args
-                        .into_iter()
-                        .map(|arg| match arg {
-                            Expression::Literal(literal) => literal,
+                    // deduplicate and sort literals in each disjunction as we go
+                    sorter.clear();
+                    for arg in args {
+                        match arg {
+                            Expression::Literal(literal) => {
+                                sorter.insert(literal);
+                            }
                             _ => panic!("Normalization failed!"),
-                        })
-                        .collect();
+                        }
+                    }
+                    let literals = sorter.iter().copied().collect();
                     Clause { literals }
                 }
                 Expression::Literal(literal) => Clause {
@@ -399,7 +404,7 @@ mod expr_tests {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct Node(usize);
 
 struct Edge {
@@ -408,12 +413,17 @@ struct Edge {
     variable: Variable,
 }
 
+struct ClausesWithComment {
+    comment: String,
+    clauses: Vec<Clause>,
+}
+
 /// Internal representation of a MonoSAT GNF.
 struct Gnf {
     n_variables: usize,
-    clauses: Vec<Clause>,
+    meta_clauses: Vec<ClausesWithComment>,
     n_nodes: usize,
-    edges: Vec<Edge>,
+    edges: Vec<(Edge, String)>,
     acyclic_variable: Variable,
 }
 
@@ -421,7 +431,7 @@ impl Gnf {
     pub fn new() -> Gnf {
         Gnf {
             n_variables: 1,
-            clauses: Vec::new(),
+            meta_clauses: Vec::new(),
             n_nodes: 0,
             edges: Vec::new(),
             acyclic_variable: Variable(1),
@@ -435,21 +445,27 @@ impl Gnf {
     }
 
     pub fn add_node(&mut self) -> Node {
-        let node_number = self.n_nodes + 1;
-        self.n_nodes = node_number;
+        let node_number = self.n_nodes;
+        self.n_nodes = node_number + 1;
         Node(node_number)
     }
 
-    pub fn add_edge(&mut self, from: Node, to: Node, variable: Variable) {
-        self.edges.push(Edge { from, to, variable })
+    pub fn add_edge(&mut self, from: Node, to: Node, variable: Variable, comment: String) {
+        self.edges.push((Edge { from, to, variable }, comment))
     }
 
-    pub fn add_clause(&mut self, clause: Clause) {
-        self.clauses.push(clause);
+    pub fn add_clause(&mut self, clause: Clause, comment: String) {
+        self.meta_clauses.push(ClausesWithComment {
+            clauses: vec![clause],
+            comment,
+        });
     }
 
-    pub fn add_clauses<I: IntoIterator<Item = Clause>>(&mut self, clauses: I) {
-        self.clauses.extend(clauses);
+    pub fn add_clauses<I: IntoIterator<Item = Clause>>(&mut self, clauses: I, comment: String) {
+        self.meta_clauses.push(ClausesWithComment {
+            clauses: clauses.into_iter().collect(),
+            comment,
+        });
     }
 
     pub fn acyclic_variable(&self) -> Variable {
@@ -459,19 +475,27 @@ impl Gnf {
     pub fn to_dimacs(&self) -> String {
         use std::fmt::Write;
 
-        let mut dimacs = format!("p cnf {} {}\n", self.n_variables, self.clauses.len());
-        for clause in self.clauses.iter() {
-            for literal in clause.literals.iter() {
-                match literal {
-                    Literal::Variable(Variable(variable)) => {
-                        write!(&mut dimacs, "{} ", variable).unwrap()
-                    }
-                    Literal::Negation(Variable(variable)) => {
-                        write!(&mut dimacs, "-{} ", variable).unwrap()
+        let clause_count = self
+            .meta_clauses
+            .iter()
+            .map(|ClausesWithComment { clauses, .. }| clauses.len())
+            .sum::<usize>();
+        let mut dimacs = format!("p cnf {} {}\n", self.n_variables, clause_count);
+        for ClausesWithComment { comment, clauses } in self.meta_clauses.iter() {
+            write!(&mut dimacs, "c {}\n", comment).unwrap();
+            for clause in clauses {
+                for literal in clause.literals.iter() {
+                    match literal {
+                        Literal::Variable(Variable(variable)) => {
+                            write!(&mut dimacs, "{} ", variable).unwrap()
+                        }
+                        Literal::Negation(Variable(variable)) => {
+                            write!(&mut dimacs, "-{} ", variable).unwrap()
+                        }
                     }
                 }
+                write!(&mut dimacs, "0\n").unwrap();
             }
-            write!(&mut dimacs, "0\n").unwrap();
         }
         write!(
             &mut dimacs,
@@ -480,11 +504,11 @@ impl Gnf {
             self.edges.len()
         )
         .unwrap();
-        for edge in self.edges.iter() {
+        for (edge, comment) in self.edges.iter() {
             write!(
                 &mut dimacs,
-                "edge 0 {} {} {}\n",
-                edge.from.0, edge.to.0, edge.variable.0
+                "c {}\nedge 0 {} {} {}\n",
+                comment, edge.from.0, edge.to.0, edge.variable.0
             )
             .unwrap()
         }
@@ -493,9 +517,28 @@ impl Gnf {
     }
 }
 
+struct KeyAccess {
+    transaction_idx: usize,
+    value: Option<Vec<u8>>,
+}
+
 fn check_history(transactions: &[(TransactionSpec, TransactionStatus)]) -> bool {
+    // edges are happens-before/happens-after relations derived from dependency or realtime.
+    // serializable: there exists a total order on the transactions that would yield the same results as observed.
+    // strictly serializable: there exists a total order on the transactions that obeys real time and that yields the same results as observed.
+    // can derive read dependencies from just the transaction history.
+    // with a transaction history that has version order, can derive write dependancies and anti-dependencies, by knowing which writes overwrite which.
+    // serialization graph is the set of such edges (excluding any crashed/ongoing transactions), want to recover it and show it's acyclic.
+    // need to derive the version order through constraint solving, since it isn't known a priori.
+    // actually, i'm not requiring that writes in transactions have unique values, (particularly because remove is like a write of None) so
+    // the read-dependencies cannot always be inferred from the transaction history, if there are multiple inserts with the same value, or if there
+    // is both an insert and a remove, then a version order is needed to determine dependency edges, so we'll consider constraints for all three kinds of dependencies.
+
     let mut gnf = Gnf::new();
-    gnf.add_clause(clause![gnf.acyclic_variable()]);
+    gnf.add_clause(
+        clause![gnf.acyclic_variable()],
+        "Acyclic property".to_string(),
+    );
     let nodes: Vec<Node> = (0..transactions.len()).map(|_| gnf.add_node()).collect();
 
     // add real-time edges to graph
@@ -508,8 +551,16 @@ fn check_history(transactions: &[(TransactionSpec, TransactionStatus)]) -> bool 
             {
                 if start_2 > end_1 {
                     let variable = gnf.add_variable();
-                    gnf.add_clause(clause![variable]);
-                    gnf.add_edge(nodes[i1], nodes[i2], variable);
+                    gnf.add_clause(
+                        clause![variable],
+                        format!("Real-time edge from T{} to T{}", i1, i2),
+                    );
+                    gnf.add_edge(
+                        nodes[i1],
+                        nodes[i2],
+                        variable,
+                        format!("Real time ordering of T{} and T{}", i1, i2),
+                    );
                 }
             }
         }
@@ -525,23 +576,32 @@ fn check_history(transactions: &[(TransactionSpec, TransactionStatus)]) -> bool 
                 .push((tx_idx, op_idx));
         }
     }
-    for (_key, tx_ops) in key_to_tx_op {
-        let mut reads: BTreeMap<Option<Vec<u8>>, usize> = BTreeMap::new();
-        let mut writes: BTreeMap<Option<Vec<u8>>, usize> = BTreeMap::new();
+    for (key, tx_ops) in key_to_tx_op {
+        let mut reads: Vec<KeyAccess> = Vec::new();
+        let mut writes: Vec<KeyAccess> = Vec::new();
         for (tx_idx, op_idx) in tx_ops {
             match &transactions[tx_idx].0.ops[op_idx] {
                 Operation::Get(_) => match &transactions[tx_idx].1 {
                     TransactionStatus::NeverRan => {}
                     TransactionStatus::Crashed(_) => {}
                     TransactionStatus::Completed(TransactionCompleted { get_results, .. }) => {
-                        reads.insert(get_results[op_idx].clone(), tx_idx);
+                        reads.push(KeyAccess {
+                            transaction_idx: tx_idx,
+                            value: get_results[op_idx].clone(),
+                        });
                     }
                 },
                 Operation::Insert(InsertOperation { value, .. }) => {
-                    writes.insert(Some(value.clone()), tx_idx);
+                    writes.push(KeyAccess {
+                        transaction_idx: tx_idx,
+                        value: Some(value.clone()),
+                    });
                 }
                 Operation::Remove(_) => {
-                    writes.insert(None, tx_idx);
+                    writes.push(KeyAccess {
+                        transaction_idx: tx_idx,
+                        value: None,
+                    });
                 }
             }
         }
@@ -551,7 +611,7 @@ fn check_history(transactions: &[(TransactionSpec, TransactionStatus)]) -> bool 
             (_, 0) => {} // no dependencies
             (0, _) => {
                 // only okay if the read is None
-                for value in reads.keys() {
+                for KeyAccess { value, .. } in reads.iter() {
                     if value.is_some() {
                         return false;
                     }
@@ -561,8 +621,15 @@ fn check_history(transactions: &[(TransactionSpec, TransactionStatus)]) -> bool 
                 // One write, and one or more reads to this key. Consider each read separately,
                 // as no constraints arise from what relative order reads occur in. (only writes
                 // and reads)
-                let (write_value, write_tx_id) = writes.iter().next().unwrap();
-                for (read_value, read_tx_id) in reads {
+                let KeyAccess {
+                    value: write_value,
+                    transaction_idx: write_tx_id,
+                } = writes.iter().next().unwrap();
+                for KeyAccess {
+                    value: read_value,
+                    transaction_idx: read_tx_id,
+                } in reads
+                {
                     // check that the values are equal, simple write->read dependency if not None or anti-dependency if None
                     match (write_value, read_value) {
                         (None, None) => {} // no dependency, read could happen before or after the delete.
@@ -573,8 +640,22 @@ fn check_history(transactions: &[(TransactionSpec, TransactionStatus)]) -> bool 
                         (Some(_), None) => {
                             // read must happen before the write, emit an anti-dependency edge.
                             let variable = gnf.add_variable();
-                            gnf.add_clause(clause![variable]);
-                            gnf.add_edge(nodes[read_tx_id], nodes[*write_tx_id], variable);
+                            gnf.add_clause(
+                                clause![variable],
+                                format!(
+                                    "R-W anti-dependency edge from T{} to T{} on {:?}",
+                                    read_tx_id, write_tx_id, key
+                                ),
+                            );
+                            gnf.add_edge(
+                                nodes[read_tx_id],
+                                nodes[*write_tx_id],
+                                variable,
+                                format!(
+                                    "R-W anti-dependeny from T{} to T{} on {:?}",
+                                    read_tx_id, write_tx_id, key
+                                ),
+                            );
                         }
                         (Some(write_value), Some(read_value)) => {
                             if *write_value != *read_value {
@@ -585,8 +666,22 @@ fn check_history(transactions: &[(TransactionSpec, TransactionStatus)]) -> bool 
                                 // write must happen before the read, emit an unconditional read
                                 // dependency edge.
                                 let variable = gnf.add_variable();
-                                gnf.add_clause(clause![variable]);
-                                gnf.add_edge(nodes[*write_tx_id], nodes[read_tx_id], variable);
+                                gnf.add_clause(
+                                    clause![variable],
+                                    format!(
+                                        "W-R dependency edge from T{} to T{} on {:?}",
+                                        write_tx_id, read_tx_id, key
+                                    ),
+                                );
+                                gnf.add_edge(
+                                    nodes[*write_tx_id],
+                                    nodes[read_tx_id],
+                                    variable,
+                                    format!(
+                                        "W-R dependency from T{} to T{} on {:?}",
+                                        write_tx_id, read_tx_id, key
+                                    ),
+                                );
                             }
                         }
                     }
@@ -594,16 +689,25 @@ fn check_history(transactions: &[(TransactionSpec, TransactionStatus)]) -> bool 
             }
             (_, _) => {
                 // read should be equal to None or one of the writes, set up edges with constraints.
-                for (read_value, read_tx_id) in reads {
+                for KeyAccess {
+                    value: read_value,
+                    transaction_idx: read_tx_id,
+                } in reads.iter()
+                {
                     let matching_write_tx_ids = writes
                         .iter()
-                        .filter_map(|(write_value, write_tx_id)| {
-                            if read_value == *write_value {
-                                Some(write_tx_id)
-                            } else {
-                                None
-                            }
-                        })
+                        .filter_map(
+                            |KeyAccess {
+                                 value: write_value,
+                                 transaction_idx: write_tx_id,
+                             }| {
+                                if *read_value == *write_value {
+                                    Some(write_tx_id)
+                                } else {
+                                    None
+                                }
+                            },
+                        )
                         .copied()
                         .collect::<Vec<_>>();
                     if read_value.is_some() && matching_write_tx_ids.is_empty() {
@@ -612,109 +716,175 @@ fn check_history(transactions: &[(TransactionSpec, TransactionStatus)]) -> bool 
                         return false;
                     }
 
-                    if read_value.is_some() {
-                        // For each candidate write transaction, there's a case with a read dependency
-                        // edge from the write tx to this read tx, and one of two edges
-                        // (anti-dependencies?) requiring that each other write tx is before the
-                        // instant matching write or after this read. This will require creating a lot
-                        // of edges and variables, and then we'll have to massage the resulting
-                        // conditions so that they can be entered into DIMACS form.
+                    // For each candidate write transaction, there's a case with a read dependency
+                    // edge from the write tx to this read tx, and one of two edges
+                    // (anti-dependencies?) requiring that each other write tx is before the
+                    // instant matching write or after this read. This will require creating a lot
+                    // of edges and variables, and then we'll have to massage the resulting
+                    // conditions so that they can be entered into DIMACS form.
 
-                        // Example, with four writes (w1tx, w2tx, w3tx, w4tx), two matching our one
-                        // read (w1tx, w2tx),
-                        // case for w1tx: (w1tx -> rtx) & ((w2tx -> w1tx | rtx -> w2tx) &
-                        //                                 (w3tx -> w1tx | rtx -> w3tx) &
-                        //                                 (w4tx -> w1tx | rtx -> w4tx))
-                        // case for w2tx: (w2tx -> rtx) & ((w1tx -> w2tx | rtx -> w1tx) &
-                        //                                 (w3tx -> w2tx | rtx -> w3tx) &
-                        //                                 (w4tx -> w2tx | rtx -> w4tx))
-                        // OR those together, and we have a very large expression with 12 unique
-                        // variables for different edges. (total of 14 variable references) We need to
-                        // turn that into "conjunctive normal form".
+                    // Example, with four writes (w1tx, w2tx, w3tx, w4tx), two matching our one
+                    // read (w1tx, w2tx),
+                    // case for w1tx: (w1tx -> rtx) & ((w2tx -> w1tx | rtx -> w2tx) &
+                    //                                 (w3tx -> w1tx | rtx -> w3tx) &
+                    //                                 (w4tx -> w1tx | rtx -> w4tx))
+                    // case for w2tx: (w2tx -> rtx) & ((w1tx -> w2tx | rtx -> w1tx) &
+                    //                                 (w3tx -> w2tx | rtx -> w3tx) &
+                    //                                 (w4tx -> w2tx | rtx -> w4tx))
+                    // OR those together, and we have a very large expression with 12 unique
+                    // variables for different edges. (total of 14 variable references) We need to
+                    // turn that into "conjunctive normal form".
 
-                        // Special case: if the read value is None, there is an additional case, where
-                        // the read came from the initial value and not any writes. This case will
-                        // assert antidependency edges from the read to every write.
+                    // Special case: if the read value is None, there is an additional case, where
+                    // the read came from the initial value and not any writes. This case will
+                    // assert antidependency edges from the read to every write.
 
-                        let read_to_write_antidep_edges = writes
-                            .values()
-                            .map(|write_tx_id| {
-                                let var = gnf.add_variable();
-                                gnf.add_edge(nodes[read_tx_id], nodes[*write_tx_id], var);
-                                var
-                            })
-                            .collect::<Vec<_>>();
-                        let mut disj_args: Vec<Expression> = matching_write_tx_ids
-                            .iter()
-                            .map(|matching_write_tx_id| {
-                                let write_to_read_dep_edge = gnf.add_variable();
-                                gnf.add_edge(
-                                    nodes[*matching_write_tx_id],
-                                    nodes[read_tx_id],
-                                    write_to_read_dep_edge,
-                                );
-                                let mut conj_args = Vec::with_capacity(writes.len());
-                                conj_args.push(Expression::Literal(Literal::Variable(
-                                    write_to_read_dep_edge,
-                                )));
-                                for (other_write_tx_id, read_to_write_antidep_edge) in
-                                    writes.values().zip(read_to_write_antidep_edges.iter())
+                    // If the outermost OR in our formula has only one sub-expression, then we can
+                    // drop the word "candidate" from certain comments, so long as the variable
+                    // isn't used inside a nested OR.
+                    let outer_disj_will_be_trivial =
+                        matching_write_tx_ids.len() + if read_value.is_none() { 1 } else { 0 } == 1;
+
+                    // Pre-generate edges and variables for R->W antidependency edges. These are the
+                    // only edges that may appear more than once in the formula, in cases where more
+                    // than one write matches the read. If there is only one matching write, then
+                    // the antidependency edge for that write will be used zero times, so we store a
+                    // None in that slot instead.
+                    let read_to_write_antidep_edges = writes
+                        .iter()
+                        .map(
+                            |KeyAccess {
+                                 transaction_idx: write_tx_id,
+                                 ..
+                             }| {
+                                if matching_write_tx_ids.len() == 1
+                                    && *write_tx_id == matching_write_tx_ids[0]
+                                    && read_value.is_some()
                                 {
-                                    if *other_write_tx_id == *matching_write_tx_id {
-                                        continue;
-                                    }
-                                    let write_to_write_antidep_edge = gnf.add_variable();
+                                    None
+                                } else {
+                                    let var = gnf.add_variable();
                                     gnf.add_edge(
-                                        nodes[*other_write_tx_id],
-                                        nodes[*matching_write_tx_id],
-                                        write_to_write_antidep_edge,
+                                        nodes[*read_tx_id],
+                                        nodes[*write_tx_id],
+                                        var,
+                                        format!(
+                                            "{}R-W anti-dependency from T{} to T{} on {:?}",
+                                            if outer_disj_will_be_trivial {
+                                                ""
+                                            } else {
+                                                "Candidate "
+                                            },
+                                            read_tx_id,
+                                            write_tx_id,
+                                            key
+                                        ),
                                     );
-                                    conj_args.push(Expression::Disjunction(vec![
-                                        Expression::Literal(Literal::Variable(
-                                            write_to_write_antidep_edge,
-                                        )),
-                                        Expression::Literal(Literal::Variable(
-                                            read_to_write_antidep_edge.clone(),
-                                        )),
-                                    ]));
+                                    Some(var)
                                 }
-                                Expression::Conjunction(conj_args)
+                            },
+                        )
+                        .collect::<Vec<_>>();
+                    let mut disj_args: Vec<Expression> = matching_write_tx_ids
+                        .iter()
+                        .map(|matching_write_tx_id| {
+                            let write_to_read_dep_edge = gnf.add_variable();
+                            let edge_name = format!(
+                                "{}W-R dependency from T{} to T{} on {:?}",
+                                if outer_disj_will_be_trivial {
+                                    ""
+                                } else {
+                                    "Candidate "
+                                },
+                                matching_write_tx_id,
+                                read_tx_id,
+                                key
+                            );
+                            gnf.add_edge(
+                                nodes[*matching_write_tx_id],
+                                nodes[*read_tx_id],
+                                write_to_read_dep_edge,
+                                edge_name,
+                            );
+                            let mut conj_args = Vec::with_capacity(writes.len());
+                            conj_args.push(Expression::Literal(Literal::Variable(
+                                write_to_read_dep_edge,
+                            )));
+                            for (other_write_tx_id, read_to_write_antidep_edge) in writes
+                                .iter()
+                                .map(
+                                    |KeyAccess {
+                                         transaction_idx, ..
+                                     }| transaction_idx,
+                                )
+                                .zip(read_to_write_antidep_edges.iter())
+                            {
+                                if *other_write_tx_id == *matching_write_tx_id {
+                                    continue;
+                                }
+                                let write_to_write_antidep_edge = gnf.add_variable();
+                                gnf.add_edge(
+                                    nodes[*other_write_tx_id],
+                                    nodes[*matching_write_tx_id],
+                                    write_to_write_antidep_edge,
+                                    format!(
+                                        "Candidate W-W anti-dependency from T{} to T{} on {:?}",
+                                        other_write_tx_id, matching_write_tx_id, key
+                                    ),
+                                );
+                                conj_args.push(Expression::Disjunction(vec![
+                                    Expression::Literal(Literal::Variable(
+                                        write_to_write_antidep_edge,
+                                    )),
+                                    Expression::Literal(Literal::Variable(
+                                        read_to_write_antidep_edge.clone().unwrap(),
+                                    )),
+                                ]));
+                            }
+                            Expression::Conjunction(conj_args)
+                        })
+                        .collect();
+                    if read_value.is_none() {
+                        let conj_args = read_to_write_antidep_edges
+                            .iter()
+                            .map(|read_to_write_antidep_edge| {
+                                Expression::Literal(Literal::Variable(
+                                    read_to_write_antidep_edge.clone().unwrap(),
+                                ))
                             })
                             .collect();
-                        if read_value.is_none() {
-                            let conj_args = read_to_write_antidep_edges
-                                .iter()
-                                .map(|read_to_write_antidep_edge| {
-                                    Expression::Literal(Literal::Variable(
-                                        read_to_write_antidep_edge.clone(),
-                                    ))
-                                })
-                                .collect();
-                            disj_args.push(Expression::Conjunction(conj_args));
-                        }
-                        let expr = Expression::Disjunction(disj_args);
-                        gnf.add_clauses(expr.to_cnf());
+                        disj_args.push(Expression::Conjunction(conj_args));
                     }
+                    let expr = Expression::Disjunction(disj_args);
+                    let writes_str = writes
+                        .iter()
+                        .map(
+                            |KeyAccess {
+                                 transaction_idx: id,
+                                 ..
+                             }| format!("T{}", id),
+                        )
+                        .collect::<Vec<String>>()
+                        .join(", ");
+                    gnf.add_clauses(
+                        expr.to_cnf(),
+                        format!(
+                            "Ordering of writes [{}] and read T{} on {:?}",
+                            writes_str, read_tx_id, key
+                        ),
+                    );
                 }
             }
         }
     }
 
-    // edges are happens-before/happens-after relations derived from dependency or realtime.
-    // serializable: there exists a total order on the transactions that would yield the same results as observed.
-    // strictly serializable: there exists a total order on the transactions that obeys real time and that yields the same results as observed.
-    // can derive read dependencies from just the transaction history.
-    // with a transaction history that has version order, can derive write dependancies and anti-dependencies, by knowing which writes overwrite which.
-    // serialization graph is the set of such edges (excluding any crashed/ongoing transactions), want to recover it and show it's acyclic.
-    // need to derive the version order through constraint solving, since it isn't known a priori.
-    // actually, i'm not requiring that writes in transactions have unique values, (particularly because remove is like a write of None) so
-    // the read-dependencies cannot always be inferred from the transaction history, if there are multiple inserts with the same value, or if there
-    // is both an insert and a remove, then a version order is needed to determine dependency edges, so we'll consider constraints for all three kinds of dependencies.
-
     let dimacs = gnf.to_dimacs();
     match run_monosat(&dimacs) {
         Ok(Satisfiability::Satisfiable) => true, // found an acyclic graph/valid version order
-        Ok(Satisfiability::Unsatisfiable) => false, // there is no valid version order
+        Ok(Satisfiability::Unsatisfiable) => {
+            // there is no valid version order
+            false
+        }
         Err(e) => panic!("Error running monosat: {}", e),
     }
 }
@@ -737,7 +907,10 @@ fn main() -> Result<(), sled::Error> {
     let mut reader = BufReader::new(File::open(stdout_file)?);
 
     let mut transactions_line = String::new();
-    reader.read_line(&mut transactions_line)?;
+    if reader.read_line(&mut transactions_line).is_err() || transactions_line.is_empty() {
+        println!("Transaction specs not written yet, OK");
+        return Ok(());
+    }
     let mut transaction_specs: Vec<TransactionSpec> =
         serde_json::from_str(&transactions_line).unwrap();
 
@@ -857,7 +1030,7 @@ fn main() -> Result<(), sled::Error> {
             .push(Operation::Get(GetOperation { key }));
         get_results.push(get_result);
     }
-    let point_read_timestamp = max_timestamp.unwrap() * 11 / 10;
+    let point_read_timestamp = max_timestamp.unwrap_or_default() * 11 / 10;
     let point_read_tx_result = TransactionStatus::Completed(TransactionCompleted {
         start: point_read_timestamp,
         end: point_read_timestamp,
@@ -873,7 +1046,7 @@ fn main() -> Result<(), sled::Error> {
         .collect();
 
     if !check_history(&transactions) {
-        panic!("Problem in transaction history\n{:#?}", transactions);
+        panic!("Problem in transaction history");
     }
 
     Ok(())
@@ -927,13 +1100,13 @@ mod tests {
             let e1_var = gnf.add_variable();
             let e2_var = gnf.add_variable();
             let e3_var = gnf.add_variable();
-            gnf.add_edge(n1, n2, e1_var);
-            gnf.add_edge(n2, n3, e2_var);
-            gnf.add_edge(n3, n1, e3_var);
-            gnf.add_clause(clause![e1_var]);
-            gnf.add_clause(clause![e2_var]);
-            gnf.add_clause(clause![e3_var]);
-            gnf.add_clause(clause![gnf.acyclic_variable()]);
+            gnf.add_edge(n1, n2, e1_var, "".to_string());
+            gnf.add_edge(n2, n3, e2_var, "".to_string());
+            gnf.add_edge(n3, n1, e3_var, "".to_string());
+            gnf.add_clause(clause![e1_var], "".to_string());
+            gnf.add_clause(clause![e2_var], "".to_string());
+            gnf.add_clause(clause![e3_var], "".to_string());
+            gnf.add_clause(clause![gnf.acyclic_variable()], "".to_string());
             let dimacs = gnf.to_dimacs();
             let res = run_monosat(&dimacs);
             assert_eq!(res.unwrap(), Satisfiability::Unsatisfiable);
@@ -946,20 +1119,26 @@ mod tests {
             let e1_var = gnf.add_variable();
             let e2_var = gnf.add_variable();
             let e3_var = gnf.add_variable();
-            gnf.add_edge(n1, n2, e1_var);
-            gnf.add_edge(n2, n3, e2_var);
-            gnf.add_edge(n3, n1, e3_var);
-            gnf.add_clause(clause![!e1_var, !e2_var, !e3_var]);
-            gnf.add_clause(Clause {
-                literals: vec![
-                    Literal::Negation(e1_var),
-                    Literal::Negation(e2_var),
-                    Literal::Negation(e3_var),
-                ],
-            });
-            gnf.add_clause(Clause {
-                literals: vec![Literal::Variable(gnf.acyclic_variable())],
-            });
+            gnf.add_edge(n1, n2, e1_var, "".to_string());
+            gnf.add_edge(n2, n3, e2_var, "".to_string());
+            gnf.add_edge(n3, n1, e3_var, "".to_string());
+            gnf.add_clause(clause![!e1_var, !e2_var, !e3_var], "".to_string());
+            gnf.add_clause(
+                Clause {
+                    literals: vec![
+                        Literal::Negation(e1_var),
+                        Literal::Negation(e2_var),
+                        Literal::Negation(e3_var),
+                    ],
+                },
+                "".to_string(),
+            );
+            gnf.add_clause(
+                Clause {
+                    literals: vec![Literal::Variable(gnf.acyclic_variable())],
+                },
+                "".to_string(),
+            );
             let dimacs = gnf.to_dimacs();
             let res = run_monosat(&dimacs);
             assert_eq!(res.unwrap(), Satisfiability::Satisfiable);
