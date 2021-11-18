@@ -240,7 +240,7 @@ fn main() {
 
                 let get_results: Vec<Option<Vec<u8>>> = db
                     .transaction::<_, _, ()>(|tree| {
-                        transaction
+                        let results = transaction
                             .ops
                             .iter()
                             .map(|op| {
@@ -258,7 +258,9 @@ fn main() {
                                     }
                                 })
                             })
-                            .collect()
+                            .collect();
+                        tree.flush();
+                        results
                     })
                     .unwrap();
 
